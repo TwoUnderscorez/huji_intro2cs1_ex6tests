@@ -63,6 +63,22 @@ class MoogleTests(unittest.TestCase):
             user_traffic_dict
         )
 
+    def test__crawl__presub(self):
+        # Setup
+        user_traffic_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(SIMPLE_PAGE_LIST, b'') as (idx_fn, out_fn):
+            user.crawl(SIMPLE_BASE_URL, idx_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_traffic_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(SIMPLE_TRAFFIC_DICT)),
+            user_traffic_dict
+        )
+
     def test__page_rank__harry_potter(self):
         # Setup
         user_rank_dict = None
@@ -76,6 +92,22 @@ class MoogleTests(unittest.TestCase):
         # Assert
         self.assertDictEqual(
             pickle.loads(base64.a85decode(HARRY_POTTER_RANK_DICT)),
+            user_rank_dict
+        )
+
+    def test__page_rank__presub(self):
+        # Setup
+        user_rank_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(SIMPLE_TRAFFIC_DICT, b'') as (td_fn, out_fn):
+            user.page_rank(SIMPLE_RANK_ITERATIONS, td_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_rank_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(SIMPLE_RANK_DICT)),
             user_rank_dict
         )
 
@@ -95,7 +127,23 @@ class MoogleTests(unittest.TestCase):
             user_words_dict
         )
 
-    def test__search__results_txt(self):
+    def test__words_dict__presub(self):
+        # Setup
+        user_words_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(SIMPLE_PAGE_LIST, b'') as (idx_fn, out_fn):
+            user.words_dict(SIMPLE_BASE_URL, idx_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_words_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(SIMPLE_WORD_DICT)),
+            user_words_dict
+        )
+
+    def test__search__harry_potter_results_txt(self):
         # Setup
         queries = ('scar', 'Crookshanks', 'Horcrux',
                    'Pensieve McGonagall', 'broom wand cape')
@@ -118,6 +166,29 @@ class MoogleTests(unittest.TestCase):
             output.getvalue()
         )
 
+    def test__search__presub(self):
+        # Setup
+        queries = ('a b',)
+        output = StringIO()
+
+        # Call user code
+        with multi_temp_file_mgr(
+                SIMPLE_RANK_DICT, SIMPLE_WORD_DICT) as (rd_f, wd_f):
+            try:
+                sys.stdout = output
+                for q in queries:
+                    user.search(q, rd_f, wd_f, 2)
+                    print('*'*10)
+            finally:
+                sys.stdout = sys.__stdout__
+
+        # Assert
+        self.assertMultiLineEqual(
+            SIMPLE_RESULTS,
+            output.getvalue(),
+            msg='### THIS TEST MAY BE BROKEN ###'
+        )
+
 
 def version_check():
     print('Checking for updates...')
@@ -138,11 +209,15 @@ def version_check():
 
 
 def main():
+    print(CHANGELOG)
+    print(KNOWN_ISSUES)
+    print('#'*80)
     if version_check():
         print('Up to date, running tests...')
         fcn_ns = ('crawl', 'page_rank', 'words_dict', 'search')
         if all([hasattr(user, a) for a in fcn_ns]):
             print('This should not take more than 4 minutes...')
+            print('In diffs, + is actual, - is expected')
             unittest.main(exit=False)
         else:
             print('''It seems that you don't have all the functions defined in your code. 
@@ -157,7 +232,6 @@ def search(query: str, rank_dict_path: str, word_dict_path: str, max_results: in
     pass
             ''')
         print("If you want to add a test or a test has failed when it shouldn't have, please contact me at yutkin@cs.huji.ac.il or open an issue or a pull request here: https://github.com/TwoUnderscorez/huji_intro2cs1_ex6tests")
-        print(CHANGELOG)
     else:
         print("We've updated the tests file, please download the new one form here")
         print('https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/tests.py')
@@ -165,10 +239,12 @@ def search(query: str, rank_dict_path: str, word_dict_path: str, max_results: in
 
 # .data
 # ### Tests infrastructure data
-VERSION = 2
+VERSION = 3
 VERSION_CHECK = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/VERSION'
-CHANGELOG = '''
-Changelog:
+CHANGELOG = '''Changelog:
+Version 3:
+Added:
+ - Presubmit tests
 Version 2:
 Added:
  - Independent tests for harry potter (for example, the tests for the search function use a predefined words dict and rank dict and not the ones you have created)
@@ -176,15 +252,21 @@ Version 1:
 Added:
  - Search results.txt test
 '''
+KNOWN_ISSUES = '''Known issues:
+1. You functions must have the exact same name and argument list as specified by below. (If it didn't, try to rename one of your functions)
+2. Tests don't ignore presision errors. 
+'''
 
-# ### Simple test data, similar to presubmit
-SIMPLE_BASE_URL = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/wiki/simple/'
+# ### Simple test data (presubmit)
+SIMPLE_BASE_URL = 'https://www.cs.huji.ac.il/~intro2cs1/ex6/presub/'
 SIMPLE_TRAFFIC_DICT = b'J-14>!%:qR!!!!b/nf?DCiKK(E<7Oj"onW\'5qZhmD/=1o9*&-!!!!!c/nf?DCiKSN"*I]M!!!!c/nf?DCiKW,E<[h)!D<H,"\\Sku"onW\'6S<%oD/=1s9*06L#CURt-tiWS!b_a1!GD^2"a+r?'
 SIMPLE_RANK_DICT = b'J-14>!%:qR!!!!b/nf?DCiKJG5Ni(Iz=9\\a*!(&;OFDYi6!_5KGz!!$+*!!!!d/nf?DCiKPI5OndSzFY3'
 SIMPLE_WORD_DICT = b'J-14>!%:qM!!!"-E<1K-![q.T!!!!b/nf?DCiKPM"BYj.!!#><BQS*-E<Jo;=9\\a*!(/APFDYi6"\\So>=9/C%!+KpPI;oK?BELm/BEUs/BE_$0F]\\YE!!$MK#^p\\!-ti]U!GDU/!GDX0#\'F#K!!!"0E=.,6$RfZj9*/c09*/c19*\'0;!<<*"AoS6-E=HR`9*00:!<<*"B5nE0E=XI2"%r]/"A8c<=9/C%!,-?`I;oiIBELm/BEUs1BE_$1F]\\YE!!$SM&q+a5-ti]U!GDU/!GDX0!HiN;'
-SIMPLE_PAGE_LIST = '''A.html
-B.html
-C.html
+SIMPLE_PAGE_LIST = b'5qZhmD/9PG/nf?DC^NN^BQS*-$3'
+SIMPLE_RANK_ITERATIONS = 1
+SIMPLE_RESULTS = '''B.html 1.125
+C.html 1.125
+**********
 '''
 # ### Harry putter wiki test data (actual data, very long)
 HARRY_POTTER_BASE_URL = 'https://www.cs.huji.ac.il/~intro2cs1/ex6/wiki/'

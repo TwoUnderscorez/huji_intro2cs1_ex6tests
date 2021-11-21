@@ -1,18 +1,58 @@
 '''⸮⁉'''
+import base64
 import difflib
+import pickle
 import pprint
+import sys
 import unittest
 import urllib.request
+from io import StringIO
+import tempfile
 from typing import Any
+import os
 
 import moogle as user
-# https://www.cs.huji.ac.il/~intro2cs1/ex6/presub/A.html
+
 # .text
 
 
 class MoogleTests(unittest.TestCase):
+    def __init__(self, methodName: str = ...) -> None:
+        super().__init__(methodName=methodName)
+        self.maxDiff = None
+
     def test__search__results_txt(self):
-        pass
+        queries = ('scar', 'Crookshanks', 'Horcrux',
+                   'Pensieve McGonagall', 'broom wand cape')
+        rd_data = base64.a85decode(HARRY_POTTER_RANK_DICT)
+        wd_data = base64.a85decode(HARRY_POTTER_WORD_DICT)
+
+        output = StringIO()
+        rd_f = None
+        wd_f = None
+        with tempfile.NamedTemporaryFile('wb', delete=False) as f:
+            f.write(rd_data)
+            rd_f = f.name
+        with tempfile.NamedTemporaryFile('wb', delete=False) as f:
+            f.write(wd_data)
+            wd_f = f.name
+
+        try:
+            sys.stdout = output
+            for q in queries:
+                user.search(q, rd_f, wd_f, 4)
+                print('*'*10)
+        finally:
+            sys.stdout = sys.__stdout__
+        a = output.getvalue()
+        self.assertMultiLineEqual(
+            HARRY_POTTER_RESULTS,
+            a
+        )
+        if os.path.exists(rd_f):
+            os.remove(rd_f)
+        if os.path.exists(wd_f):
+            os.remove(wd_f)
 
 
 def version_check():
@@ -46,12 +86,16 @@ def main():
 # .data
 # ### Tests infrastructure data
 VERSION = 1
-VERSION_CHECK = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex5/master/VERSION'
+VERSION_CHECK = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/VERSION'
 CHANGELOG = '''
 Changelog:
+Version 1:
+Added:
+ - Search results.txt test
 '''
 
 # ### Simple test data, similar to presubmit
+SIMPLE_BASE_URL = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/wiki/simple/'
 SIMPLE_TRAFFIC_DICT = b'J-14>!%:qR!!!!b/nf?DCiKK(E<7Oj"onW\'5qZhmD/=1o9*&-!!!!!c/nf?DCiKSN"*I]M!!!!c/nf?DCiKW,E<[h)!D<H,"\\Sku"onW\'6S<%oD/=1s9*06L#CURt-tiWS!b_a1!GD^2"a+r?'
 SIMPLE_RANK_DICT = b'J-14>!%:qR!!!!b/nf?DCiKJG5Ni(Iz=9\\a*!(&;OFDYi6!_5KGz!!$+*!!!!d/nf?DCiKPI5OndSzFY3'
 SIMPLE_WORD_DICT = b'J-14>!%:qM!!!"-E<1K-![q.T!!!!b/nf?DCiKPM"BYj.!!#><BQS*-E<Jo;=9\\a*!(/APFDYi6"\\So>=9/C%!+KpPI;oK?BELm/BEUs/BE_$0F]\\YE!!$MK#^p\\!-ti]U!GDU/!GDX0#\'F#K!!!"0E=.,6$RfZj9*/c09*/c19*\'0;!<<*"AoS6-E=HR`9*00:!<<*"B5nE0E=XI2"%r]/"A8c<=9/C%!,-?`I;oiIBELm/BEUs1BE_$1F]\\YE!!$SM&q+a5-ti]U!GDU/!GDX0!HiN;'
@@ -60,6 +104,7 @@ B.html
 C.html
 '''
 # ### Harry putter wiki test data (actual data, very long)
+HARRY_POTTER_BASE_URL = 'https://www.cs.huji.ac.il/~intro2cs1/ex6/presub/A.html'
 HARRY_POTTER_LIST = '''Albus_Dumbledore.html
 Draco_Malfoy.html
 Ginevra_Weasley.html

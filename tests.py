@@ -1,19 +1,45 @@
 '''⸮⁉'''
 import base64
-import difflib
+import os
 import pickle
-import pprint
 import sys
+import tempfile
 import unittest
 import urllib.request
+from contextlib import contextmanager
 from io import StringIO
-import tempfile
-from typing import Any
-import os
+from typing import List
 
 import moogle as user
 
 # .text
+
+
+@contextmanager
+def temp_file_mgr(raw_data: bytes):
+    f = tempfile.NamedTemporaryFile('wb', delete=False)
+    f.write(base64.a85decode(raw_data))
+    name = f.name
+    f.close()
+    try:
+        yield name
+    finally:
+        if os.path.exists(name):
+            os.remove(name)
+
+
+@contextmanager
+def multi_temp_file_mgr(*raw_data: List[bytes]):
+    fs = [tempfile.NamedTemporaryFile('wb', delete=False) for _ in raw_data]
+    _ = [f.write(base64.a85decode(d)) for f, d in zip(fs, raw_data)]
+    names = [f.name for f in fs]
+    _ = [f.close() for f in fs]
+    try:
+        yield names
+    finally:
+        for n in names:
+            if os.path.exists(n):
+                os.remove(n)
 
 
 class MoogleTests(unittest.TestCase):
@@ -21,41 +47,80 @@ class MoogleTests(unittest.TestCase):
         super().__init__(methodName=methodName)
         self.maxDiff = None
 
+    def test__crawl__harry_potter(self):
+        # Setup
+        user_traffic_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(HARRY_POTTER_LIST, b'') as (idx_fn, out_fn):
+            user.crawl(HARRY_POTTER_BASE_URL, idx_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_traffic_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(HARRY_POTTER_TRAFFIC_DICT)),
+            user_traffic_dict
+        )
+
+    def test__page_rank__harry_potter(self):
+        # Setup
+        user_rank_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(HARRY_POTTER_TRAFFIC_DICT, b'') as (td_fn, out_fn):
+            user.page_rank(HARRY_POTTER_RANK_ITERATIONS, td_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_rank_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(HARRY_POTTER_RANK_DICT)),
+            user_rank_dict
+        )
+
+    def test__words_dict__harry_potter(self):
+        # Setup
+        user_words_dict = None
+
+        # Call user code
+        with multi_temp_file_mgr(HARRY_POTTER_LIST, b'') as (idx_fn, out_fn):
+            user.words_dict(HARRY_POTTER_BASE_URL, idx_fn, out_fn)
+            with open(out_fn, 'rb') as f:
+                user_words_dict = pickle.load(f)
+
+        # Assert
+        self.assertDictEqual(
+            pickle.loads(base64.a85decode(HARRY_POTTER_WORD_DICT)),
+            user_words_dict
+        )
+
     def test__search__results_txt(self):
+        # Setup
         queries = ('scar', 'Crookshanks', 'Horcrux',
                    'Pensieve McGonagall', 'broom wand cape')
-        rd_data = base64.a85decode(HARRY_POTTER_RANK_DICT)
-        wd_data = base64.a85decode(HARRY_POTTER_WORD_DICT)
-
         output = StringIO()
-        rd_f = None
-        wd_f = None
-        with tempfile.NamedTemporaryFile('wb', delete=False) as f:
-            f.write(rd_data)
-            rd_f = f.name
-        with tempfile.NamedTemporaryFile('wb', delete=False) as f:
-            f.write(wd_data)
-            wd_f = f.name
 
-        try:
-            sys.stdout = output
-            for q in queries:
-                user.search(q, rd_f, wd_f, 4)
-                print('*'*10)
-        finally:
-            sys.stdout = sys.__stdout__
-        a = output.getvalue()
+        # Call user code
+        with multi_temp_file_mgr(
+                HARRY_POTTER_RANK_DICT, HARRY_POTTER_WORD_DICT) as (rd_f, wd_f):
+            try:
+                sys.stdout = output
+                for q in queries:
+                    user.search(q, rd_f, wd_f, 4)
+                    print('*'*10)
+            finally:
+                sys.stdout = sys.__stdout__
+
+        # Assert
         self.assertMultiLineEqual(
             HARRY_POTTER_RESULTS,
-            a
+            output.getvalue()
         )
-        if os.path.exists(rd_f):
-            os.remove(rd_f)
-        if os.path.exists(wd_f):
-            os.remove(wd_f)
 
 
 def version_check():
+    print('Checking for updates...')
     up_to_date = True
     req = urllib.request.Request(
         url=VERSION_CHECK, method='GET'
@@ -75,12 +140,27 @@ def version_check():
 def main():
     if version_check():
         print('Up to date, running tests...')
-        unittest.main(exit=False)
-        print("If a test has failed when it shouldn't have, please contact me at yutkin@cs.huji.ac.il or open an issue or a pull request here: https://github.com/TwoUnderscorez/huji_intro2cs1_ex5")
+        fcn_ns = ('crawl', 'page_rank', 'words_dict', 'search')
+        if all([hasattr(user, a) for a in fcn_ns]):
+            print('This should not take more than 4 minutes...')
+            unittest.main(exit=False)
+        else:
+            print('''It seems that you don't have all the functions defined in your code. 
+Please make sure that all four functions are defined in your code as shown below (I don't have enough time to mess around with the subprocess module):
+def crawl(base_url: str, index_file: str, out_file: str):
+    pass
+def page_rank(iterations: int, dict_file: str, out_file: str):
+    pass
+def words_dict(base_url: str, index_file: str, out_file: str):
+    pass
+def search(query: str, rank_dict_path: str, word_dict_path: str, max_results: int):
+    pass
+            ''')
+        print("If you want to add a test or a test has failed when it shouldn't have, please contact me at yutkin@cs.huji.ac.il or open an issue or a pull request here: https://github.com/TwoUnderscorez/huji_intro2cs1_ex6tests")
         print(CHANGELOG)
     else:
         print("We've updated the tests file, please download the new one form here")
-        print('https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex5/master/ex5tests.py')
+        print('https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/tests.py')
 
 
 # .data
@@ -89,6 +169,9 @@ VERSION = 1
 VERSION_CHECK = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/VERSION'
 CHANGELOG = '''
 Changelog:
+Version 2:
+Added:
+ - Independent tests for harry potter (for example, the tests for the search function use a predefined words dict and rank dict and not the ones you have created)
 Version 1:
 Added:
  - Search results.txt test
@@ -104,20 +187,10 @@ B.html
 C.html
 '''
 # ### Harry putter wiki test data (actual data, very long)
-HARRY_POTTER_BASE_URL = 'https://www.cs.huji.ac.il/~intro2cs1/ex6/presub/A.html'
-HARRY_POTTER_LIST = '''Albus_Dumbledore.html
-Draco_Malfoy.html
-Ginevra_Weasley.html
-Harry_Potter.html
-Hermione_Granger.html
-Hogwarts_School_of_Witchcraft_and_Wizardry.html
-Luna_Lovegood.html
-Neville_Longbottom.html
-Ronald_Weasley.html
-Rubeus_Hagrid.html
-Severus_Snape.html
-Tom_Riddle.html
-'''
+HARRY_POTTER_BASE_URL = 'https://www.cs.huji.ac.il/~intro2cs1/ex6/wiki/'
+HARRY_POTTER_MAX_RESULTS = 4
+HARRY_POTTER_RANK_ITERATIONS = 100
+HARRY_POTTER_LIST = b'6#:"QF\'h=XD.7<mA8cL"/nf?DC^NRN@:O4_9jqjMDg<sKFDYh$7qljPG&h"u=(Pf]Ch7lEBQS*-$:nTGEd;"gDfg)4E\\;$ID/9PMATDX%Df0,n7ri$UB4Z*9BQS*-$:o)JG@>N6F\'hjUBQ%g*?Z0O`=(ubdBOc\'kAoqBgDId*UBmO3.A9)rJBQS*-$;>S[@:)]HG%G<)De(J6FDYh$:1\\T_Ci!Zi9Q+f]@W-@1Df%+?FDYh$;K$G]Ch-mSARTXrAU,nAFDYh$;KZG[F`Un\\@:sUpA1hP;D/9PXAThX*F`UngDIIKq/nf?DC^O-[D-p1TA7TLf/nf?DC]'
 HARRY_POTTER_RESULTS = '''Harry_Potter.html 42.00962074209243
 Tom_Riddle.html 6.1419716884263345
 Albus_Dumbledore.html 1.3692695417054577

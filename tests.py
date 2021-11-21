@@ -165,7 +165,7 @@ def search(query: str, rank_dict_path: str, word_dict_path: str, max_results: in
 
 # .data
 # ### Tests infrastructure data
-VERSION = 1
+VERSION = 2
 VERSION_CHECK = 'https://raw.githubusercontent.com/TwoUnderscorez/huji_intro2cs1_ex6tests/master/VERSION'
 CHANGELOG = '''
 Changelog:
